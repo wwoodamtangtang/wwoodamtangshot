@@ -1,0 +1,87 @@
+---
+import { Image } from "astro:assets";
+import { getCollection } from "astro:content";
+
+import Layout from "../../layouts/Layout.astro";
+import Lightbox from "../../components/Lightbox.astro";
+import { getAlbumImages } from "../../utils/albums";
+
+export async function getStaticPaths() {
+  const albums = await getCollection("albums");
+
+  const paths = Object.values(albums).map((album) => {
+    return {
+      params: {
+        id: album.id,
+      },
+      props: {
+        album,
+      },
+    };
+  });
+
+  return paths;
+}
+
+const { album } = Astro.props;
+const images = await getAlbumImages(album.id);
+---
+
+<Layout title={album.data.title}>
+  <div class="text-center">
+    <h1 class="text-5xl font-bold">
+      {album.data.title}
+    </h1>
+    <p class="text-xl my-4">
+      {album.data.description}
+    </p>
+
+    <div
+      class="mx-auto container my-8 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 text-center"
+    >
+      {
+        images.map((image, index) => (
+          <Image
+            src={image}
+            alt={`Image from ${album.data.title} album`}
+            widths={[240, 540, 720]}
+            format="webp"
+            quality={20}
+            class:list={[
+              "rounded-lg transition-all",
+              "hover:border-gray-800 hover:shadow-lg hover:opacity-90",
+              "mb-4 image-preview",
+            ]}
+            loading="lazy"
+            id={`preview-${index}`}
+          />
+        ))
+      }
+    </div>
+
+    <p class="text-lg my-4 text-center">
+      <a href="/" class="hover:underline">View other albums</a>
+    </p>
+  </div>
+</Layout>
+<Lightbox images={images} />
+
+<script>
+  const galleryImages = document.querySelectorAll(".image-preview");
+
+  galleryImages.forEach((img) => {
+    img.addEventListener("click", () => {
+      const lightbox = document.querySelector("#lightbox");
+      const lightboxImages = document.querySelectorAll("[lightbox-images]");
+
+      const index = parseInt(img.id.split("-")[1]);
+      lightboxImages.forEach((li) => {
+        li.classList.add("hidden");
+        li.removeAttribute("activeImage");
+      });
+      lightboxImages[index].classList.toggle("hidden");
+      lightboxImages[index].setAttribute("activeImage", "");
+      lightbox.showModal();
+    });
+  });
+</script>

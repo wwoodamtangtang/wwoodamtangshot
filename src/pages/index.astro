@@ -1,16 +1,59 @@
 ---
+import { Image } from "astro:assets";
+import { getCollection } from "astro:content";
 
+import Layout from "../layouts/Layout.astro";
+import { getAlbumImages } from "../utils/albums";
+
+const albums = await getCollection("albums");
+
+const computeCounts = async (album) => {
+  const images = await getAlbumImages(album.id);
+  return [album.id, images.length];
+};
+
+const imageCounts = Object.fromEntries(
+  await Promise.all(albums.map(computeCounts)),
+);
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout title="Gallery">
+  <div class="text-center">
+    <h1 class="text-5xl font-bold my-6">Picture Gallery</h1>
+  </div>
+  <div
+    class="mx-auto container grid lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4"
+  >
+    {
+      albums.map((item) => (
+        <a href={`/gallery/${item.id}`} class="group transition-all mb-4 block">
+          <div class="relative">
+            <Image
+              src={item.data.cover}
+              alt={item.data.title}
+              format="webp"
+              width={720}
+              quality="mid"
+              class:list={[
+                "rounded-lg transition-all",
+                "group-hover:shadow-lg group-hover:opacity-90",
+              ]}
+            />
+            <div class="absolute w-full h-full top-0 left-0 rounded-lg bg-gradient-to-br from-transparent to-slate-900 transition-opacity opacity-0 hover:opacity-80">
+              <p class="absolute text-2xl md:text-xl bottom-3 right-3 text-gray-50">
+                {imageCounts[item.id]}{" "}
+                <span class="relative bottom-0.5" style="">
+                  📷
+                </span>
+              </p>
+            </div>
+          </div>
+          <div class="mt-4 text-center text-neutral-800">
+            <strong class="font-bold text-xl">{item.data.title}</strong>
+            <p class="text-s">{item.data.description}</p>
+          </div>
+        </a>
+      ))
+    }
+  </div>
+</Layout>

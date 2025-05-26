@@ -1,7 +1,5 @@
 ---
-import { Image } from "astro:assets";
 import { getCollection } from "astro:content";
-
 import Layout from "../layouts/Layout.astro";
 import { getAlbumImages } from "../utils/albums";
 
@@ -13,49 +11,49 @@ const computeCounts = async (album) => {
 };
 
 const imageCounts = Object.fromEntries(
-  await Promise.all(albums.map(computeCounts)),
+  await Promise.all(albums.map(computeCounts))
 );
 
 const base_url = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL;
+
+// 최신 날짜 기준 내림차순 정렬
+const sortedAlbums = [...albums].sort((a, b) =>
+  a.data.date < b.data.date ? 1 : -1
+);
 ---
 
 <Layout title="Gallery">
   <div class="text-center">
-    <h1 class="text-5xl font-bold my-6">Picture Gallery</h1>
+    <h1 class="text-5xl font-bold my-6">wwoodamtangshot</h1>
   </div>
-  <div
-    class="mx-auto container grid lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1 gap-4"
-  >
-    {
-      albums.map((item) => (
-      <a href={`${base_url}/gallery/${item.id}`} class="group transition-all mb-4 block">
-          <div class="relative">
-            <Image
-              src={item.data.cover}
-              alt={item.data.title}
-              format="webp"
-              width={720}
-              quality="mid"
-              class:list={[
-                "rounded-lg transition-all",
-                "group-hover:shadow-lg group-hover:opacity-90",
-              ]}
-            />
-            <div class="absolute w-full h-full top-0 left-0 rounded-lg bg-gradient-to-br from-transparent to-slate-900 transition-opacity opacity-0 hover:opacity-80">
-              <p class="absolute text-2xl md:text-xl bottom-3 right-3 text-gray-50">
-                {imageCounts[item.id]}{" "}
-                <span class="relative bottom-0.5" style="">
-                  📷
-                </span>
-              </p>
+    <div class="mx-auto container grid grid-cols-3 gap-0.5">
+      {sortedAlbums.map((item) => (
+        <a
+          href={`${base_url}/gallery/${item.id}`}
+          class="group"
+        >
+        <div class="relative aspect-square overflow-hidden rounded-sm">
+          <img
+            src={`${base_url}/src/content/albums/${item.data.cover}`}
+            alt={item.data.title}
+            loading="lazy"
+            class="object-cover w-full h-full transition-all group-hover:shadow-lg group-hover:opacity-90"
+          />
+         <!-- 제목·설명 오버레이: 하단 정렬 -->
+        <div
+           class="absolute inset-0 bg-black bg-opacity-40 flex flex-col justify-end p-2"
+         >
+            <div class="text-center text-neutral-100">
+              <strong class="block font-bold text-xl">
+                {item.data.title}
+              </strong>
+              {item.data.description && (
+                <p class="mt-2 text-sm">{item.data.description}</p>
+              )}
             </div>
           </div>
-          <div class="mt-4 text-center text-neutral-800">
-            <strong class="font-bold text-xl">{item.data.title}</strong>
-            <p class="text-s">{item.data.description}</p>
-          </div>
-        </a>
-      ))
-    }
+        </div>
+      </a>
+    ))}
   </div>
 </Layout>

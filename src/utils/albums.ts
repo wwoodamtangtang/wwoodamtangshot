@@ -1,7 +1,11 @@
+import exifr from "exifr";
+import { fileURLToPath } from "url";
+
 export async function getAlbumImages(albumId: string) {
   // 1. List all album files from collections path
   let images = import.meta.glob<{ default: ImageMetadata }>(
-    "/src/content/albums/**/*.{jpeg,jpg}",
+    "../content/albums/**/*.{jpeg,jpg}",
+    { eager: false }
   );
 
   // 2. Filter images by albumId
@@ -9,9 +13,21 @@ export async function getAlbumImages(albumId: string) {
     Object.entries(images).filter(([key]) => key.includes(albumId)),
   );
 
-  // 3. Images are promises, so we need to resolve the glob promises
+  // 3. Images are promises, so we need to resolve the glob promises and parse EXIF data
   const resolvedImages = await Promise.all(
-    Object.values(images).map((image) => image().then((mod) => mod.default)),
+    Object.entries(images).map(async ([filepath, importer]) => {
+      const { default: meta } = await importer();
+      const realPath = fileURLToPath(new URL(filepath, import.meta.url));
+      const exif = await exifr.parse(realPath, [
+        "Make",
+        "Model",
+        "FNumber",
+        "ExposureTime",
+        "ISO",
+        "DateTimeOriginal",
+      ]);
+      return { ...meta, exif };
+    })
   );
 
   // 4. Shuffle images with random order

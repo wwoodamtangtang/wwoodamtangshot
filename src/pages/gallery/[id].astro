@@ -1,26 +1,15 @@
 ---
 import { Image } from "astro:assets";
 import { getCollection } from "astro:content";
-
 import Layout from "../../layouts/Layout.astro";
-import Lightbox from "../../components/Lightbox.astro";
 import { getAlbumImages } from "../../utils/albums";
 
 export async function getStaticPaths() {
   const albums = await getCollection("albums");
-
-  const paths = Object.values(albums).map((album) => {
-    return {
-      params: {
-        id: album.id,
-      },
-      props: {
-        album,
-      },
-    };
-  });
-
-  return paths;
+  return Object.values(albums).map((album) => ({
+    params: { id: album.id },
+    props: { album },
+  }));
 }
 
 const { album } = Astro.props;
@@ -29,59 +18,267 @@ const images = await getAlbumImages(album.id);
 
 <Layout title={album.data.title}>
   <div class="text-center">
-    <h1 class="text-5xl font-bold">
-      {album.data.title}
-    </h1>
-    <p class="text-xl my-4">
-      {album.data.description}
-    </p>
-
-    <div
-      class="mx-auto container my-8 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 text-center"
-    >
-      {
-        images.map((image, index) => (
+    <h1 class="text-5xl font-bold my-6">{album.data.title}</h1>
+    <p class="text-xl my-4">{album.data.description}</p>
+    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 gap-0.5">
+      {images.map((src, i) => (
+        <div
+          class="relative w-full pb-[100%] cursor-pointer image-thumb"
+          data-index={i}
+        >
           <Image
-            src={image}
-            alt={`Image from ${album.data.title} album`}
+            src={src}
+            alt={`Photo ${i + 1}`}
             widths={[240, 540, 720]}
             format="webp"
             quality={20}
-            class:list={[
-              "rounded-lg transition-all",
-              "hover:border-gray-800 hover:shadow-lg hover:opacity-90",
-              "mb-4 image-preview",
-            ]}
-            loading="lazy"
-            id={`preview-${index}`}
+            class="absolute inset-0 w-full h-full object-cover rounded-sm"
           />
-        ))
-      }
+        </div>
+      ))}
     </div>
-
-    <p class="text-lg my-4 text-center">
-      <a href="/" class="hover:underline">View other albums</a>
-    </p>
   </div>
 </Layout>
-<Lightbox images={images} />
 
-<script>
-  const galleryImages = document.querySelectorAll(".image-preview");
+<!-- Lightbox Overlay -->
+<div id="overlay">
+  <!-- Prev Button -->
+  <button id="btn-prev" aria-label="Previous">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="white" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </button>
 
-  galleryImages.forEach((img) => {
-    img.addEventListener("click", () => {
-      const lightbox = document.querySelector("#lightbox");
-      const lightboxImages = document.querySelectorAll("[lightbox-images]");
+  <!-- Lightbox Content -->
+  <div id="lightbox">
+    <!-- Desktop Track -->
+    <div id="track-wrapper">
+      <div id="track-inner">
+        {images.map((image, i) => {
+          const { src, exif } = image;
+          const exptime = exif.ExposureTime;
+          const shutterStr = typeof exptime === 'number'
+            ? (exptime < 1 ? `1/${Math.round(1 / exptime)}` : `${exptime}`)
+            : '';
+          const dt = exif.DateTimeOriginal;
+          const dtStr = dt instanceof Date
+            ? `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+            : '';
+          return (
+            <div class="slide">
+              <Image
+                src={image}
+                alt={`Photo ${i + 1}`}
+                widths={[240, 540, 720, 1920]}
+                format="webp"
+                quality={85}
+                class="max-w-full max-h-full object-contain"
+              />
+              <figcaption class="caption">
+                {exif.Make} {exif.Model} · f/{exif.FNumber} · {shutterStr}s · ISO{exif.ISO} · {dtStr} · Copyright© DAMWOO KIM
+              </figcaption>
+            </div>
+          );
+        })}
+      </div>
+    </div>
 
-      const index = parseInt(img.id.split("-")[1]);
-      lightboxImages.forEach((li) => {
-        li.classList.add("hidden");
-        li.removeAttribute("activeImage");
+    <!-- Mobile Feed -->
+    <div id="mobile-feed">
+      {images.map((image, i) => {
+        const { src, exif } = image;
+        const exptime = exif.ExposureTime;
+        const shutterStr = typeof exptime === 'number'
+          ? (exptime < 1 ? `1/${Math.round(1 / exptime)}` : `${exptime}`)
+          : '';
+        const dt = exif.DateTimeOriginal;
+        const dtStr = dt instanceof Date
+          ? `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+          : '';
+        return (
+          <div class="feed-item" data-index={i}>
+            <Image
+              src={image}
+              alt={`Photo ${i + 1}`}
+              widths={[240, 540, 720, 1080]}
+              format="webp"
+              quality={85}
+              class="w-full object-contain rounded-sm"
+            />
+            <figcaption class="caption">
+              {exif.Make} {exif.Model} · f/{exif.FNumber} · {shutterStr}s · ISO{exif.ISO} · {dtStr} · Copyright© DAMWOO KIM
+            </figcaption>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+
+  <!-- Next Button -->
+  <button id="btn-next" aria-label="Next">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="white" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+    </svg>
+  </button>
+</div>
+
+<style>
+  /* 오버레이 기본 숨김, active 시 flex */
+  #overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  #overlay.active {
+    display: flex;
+  }
+
+  /* 버튼 숨김, 데스크탑에서만 보이기 */
+  #btn-prev, #btn-next {
+    display: none;
+    position: absolute; top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.5);
+    border: none; border-radius: 9999px;
+    padding: 8px; cursor: pointer; z-index: 1;
+  }
+  #btn-prev { left: 16px; }
+  #btn-next { right: 16px; }
+
+  /* 라이트박스 컨테이너 */
+  #lightbox {
+    position: relative;
+    width: 95vw; height: 95vh;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* 데스크탑 트랙 */
+  #track-wrapper { display: none; width:100%; height:100%; overflow:hidden; position:relative; }
+  #track-inner { display:flex; height:100%; transition:transform .3s ease; }
+  .slide { flex-shrink:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; }
+
+  /* 모바일 피드 */
+  #mobile-feed { display:flex; width:100%; height:100%; overflow-y:auto; flex-direction:column; gap:16px; padding:16px; box-sizing:border-box; }
+  .feed-item { width:100%; }
+
+  /* 캡션 */
+  .caption { color:white; margin-top:3px; font-size:0.6rem; }
+
+  /* 모바일에서 캡션 중앙 정렬 */
+  @media (max-width: 767px) {
+    #mobile-feed .caption {
+      text-align: center;
+    }
+  }
+
+  @media (min-width:768px) {
+    #track-wrapper { display:block; }
+    #mobile-feed   { display:none; }
+    #btn-prev,#btn-next { display:block; }
+  }
+
+  /* 모바일 스크롤바 숨기기 */
+  #mobile-feed { -ms-overflow-style:none; scrollbar-width:none; }
+  #mobile-feed::-webkit-scrollbar { display:none; }
+</style>
+
+<script type="module">
+  document.addEventListener("DOMContentLoaded", () => {
+    const thumbs       = document.querySelectorAll('.image-thumb');
+    const overlay      = document.getElementById('overlay');
+    const lightbox     = document.getElementById('lightbox');
+    const trackWrapper = document.getElementById('track-wrapper');
+    const trackInner   = document.getElementById('track-inner');
+    const mobileFeed   = document.getElementById('mobile-feed');
+    const btnPrev      = document.getElementById('btn-prev');
+    const btnNext      = document.getElementById('btn-next');
+    let currentIndex   = 0;
+
+    function updateTrack() {
+      const w = lightbox.clientWidth;
+      Array.from(trackInner.children).forEach(slide => {
+        slide.style.width = `${w}px`;
       });
-      lightboxImages[index].classList.toggle("hidden");
-      lightboxImages[index].setAttribute("activeImage", "");
-      lightbox.showModal();
+      trackInner.style.width = `${trackInner.children.length * w}px`;
+      moveTo(currentIndex, false);
+    }
+
+    function moveTo(idx, animate = true) {
+      const w = lightbox.clientWidth;
+      trackInner.style.transition = animate ? 'transform .3s ease' : 'none';
+      trackInner.style.transform  = `translateX(-${idx * w}px)`;
+      currentIndex = idx;
+    }
+
+    function showLightbox(idx) {
+      currentIndex = idx;
+      overlay.classList.add('active');
+
+      if (window.innerWidth >= 768) {
+        updateTrack();
+      } else {
+        const item = mobileFeed.querySelectorAll('.feed-item')[idx];
+        if (item) item.scrollIntoView({ behavior: 'auto' });
+      }
+    }
+
+    thumbs.forEach((t, i) => {
+      t.addEventListener('click', () => showLightbox(i));
+    });
+    // 빈 공간 클릭 시 닫기 (이미지, 버튼 제외)
+    overlay.addEventListener('click', (e) => {
+      const clickedOnImage   = !!e.target.closest('img');
+      const clickedOnControl = !!e.target.closest('#btn-prev, #btn-next');
+      if (!clickedOnImage && !clickedOnControl) {
+        overlay.classList.remove('active');
+      }
+    });
+
+    btnPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveTo((currentIndex - 1 + trackInner.children.length) % trackInner.children.length);
+    });
+    btnNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveTo((currentIndex + 1) % trackInner.children.length);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!overlay.classList.contains('active')) return;
+      if (e.key === 'ArrowLeft') btnPrev.click();
+      else if (e.key === 'ArrowRight') btnNext.click();
+      else if (e.key === 'Escape') overlay.classList.remove('active');
+    });
+
+    // 터치 스와이프 (데스크탑 트랙)
+    let startX = 0, dx = 0;
+    overlay.addEventListener('touchstart', (e) => {
+      if (window.innerWidth < 768) return;
+      startX = e.touches[0].clientX; dx = 0;
+      trackInner.style.transition = 'none';
+    });
+    overlay.addEventListener('touchmove', (e) => {
+      if (window.innerWidth < 768) return;
+      dx = e.touches[0].clientX - startX;
+      trackInner.style.transform = `translateX(-${currentIndex * lightbox.clientWidth - dx}px)`;
+    });
+    overlay.addEventListener('touchend', () => {
+      if (window.innerWidth < 768) return;
+      trackInner.style.transition = 'transform .3s ease';
+      const thresh = lightbox.clientWidth * 0.2;
+      if (dx > thresh) moveTo((currentIndex - 1 + trackInner.children.length) % trackInner.children.length);
+      else if (dx < -thresh) moveTo((currentIndex + 1) % trackInner.children.length);
+      else moveTo(currentIndex);
+    });
+
+    window.addEventListener('resize', () => {
+      if (overlay.classList.contains('active') && window.innerWidth >= 768) {
+        updateTrack();
+      }
     });
   });
 </script>

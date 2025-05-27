@@ -4,28 +4,29 @@ import path from "path";
 import type { ImageMetadata } from "astro:assets";
 
 export async function getAlbumImages(albumId: string) {
-  // 1) 프로젝트 루트 기준 src/content/albums 폴더를 glob
+  // 1) 이 파일(src/utils) 기준으로 한 칸 위 폴더(src) 내 content/albums 을 glob
   const images = import.meta.glob<{ default: ImageMetadata }>(
-    "./src/content/albums/**/*.{jpeg,jpg}"
+    "../content/albums/**/*.{jpeg,jpg}"
   );
 
-  // 2) albumId 폴더로 필터링
+  // 2) albumId 포함된 파일만 필터
   const entries = Object.entries(images).filter(([filepath]) =>
-    filepath.includes(`/src/content/albums/${albumId}/`)
+    filepath.includes(`/content/albums/${albumId}/`)
   );
 
-  // 3) 각 이미지에 대해 EXIF 파싱하여 메타정보에 추가
+  // 3) 각 이미지마다 EXIF 파싱 & meta 합치기
   const resolved = await Promise.all(
     entries.map(async ([filepath, importer]) => {
-      // Astro가 제공하는 메타 정보 읽기
+      // Astro가 제공하는 이미지 메타
       const { default: meta } = await importer();
 
-      // filepath 예시: "./src/content/albums/2025-03-17/DSF7676.jpeg"
-      // 앞의 "./" 제거 → "src/content/albums/..."
-      const fsPath = filepath.replace(/^\.\//, "");
-      // process.cwd()는 빌드 환경에서 프로젝트 루트를 가리킵니다.
-      const realPath = path.resolve(process.cwd(), fsPath);
+      // filepath 예: "../content/albums/2025-03-17/DSF7676.jpeg"
+      // 앞의 "../" 제거 → "content/albums/2025-03-17/DSF7676.jpeg"
+      let relPath = filepath.replace(/^\.\.\//, "");
+      // 실제 파일 시스템 경로: 프로젝트 루트/src/content/...
+      const realPath = path.join(process.cwd(), "src", relPath);
 
+      // EXIF 파싱
       const exif = await exifr.parse(realPath, [
         "Make",
         "Model",

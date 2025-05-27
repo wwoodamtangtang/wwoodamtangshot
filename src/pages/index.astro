@@ -34,7 +34,7 @@ const sortedAlbums = [...albums].sort((a, b) =>
         >
         <div class="relative aspect-square overflow-hidden rounded-sm">
           <img
-            src={`${base_url}/albums/${encodeURIComponent(item.id)}/${encodeURIComponent(item.data.cover)}`}
+            src={`/albums/${encodeURIComponent(item.id)}/${encodeURIComponent(item.data.cover)}`}
             alt={item.data.title}
             loading="lazy"
             class="object-cover w-full h-full transition-all group-hover:shadow-lg group-hover:opacity-90"

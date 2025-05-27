@@ -4,7 +4,7 @@ import tailwind from "@astrojs/tailwind";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://0xsbock.github.io",
-  base: "wwoodamtangshot",
+  site: "https://wwoodamtangshot-git-main-damwoos-projects.vercel.app",
+  base: "/",
   integrations: [tailwind()],
 });

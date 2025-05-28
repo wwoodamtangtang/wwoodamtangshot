@@ -18,7 +18,7 @@ const images = await getAlbumImages(album.id);
 
 <Layout title={album.data.title}>
   <div class="text-center">
-    <h1 class="text-5xl font-bold my-6">{album.data.title}</h1>
+    <h1 class="text-5xl font-bold my-6" set:html={album.data.title}></h1>
     <p class="text-xl my-4">{album.data.description}</p>
     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 gap-0.5">
       {images.map((src, i) => (
@@ -74,8 +74,8 @@ const images = await getAlbumImages(album.id);
                 quality={85}
                 class="max-w-full max-h-full object-contain"
               />
-              <figcaption class="caption">
-                {exif.Make} {exif.Model} · f/{exif.FNumber} · {shutterStr}s · ISO{exif.ISO} · {dtStr} · Copyright© DAMWOO KIM
+              <figcaption class="caption text-center">
+                {exif.Make} {exif.Model} · f/{exif.FNumber} · {shutterStr}s · ISO{exif.ISO} · {dtStr}<br>Copyright© DAMWOO KIM
               </figcaption>
             </div>
           );

@@ -44,9 +44,8 @@ const sortedAlbums = [...albums].sort((a, b) =>
            class="absolute inset-0 bg-black bg-opacity-40 flex flex-col justify-end p-2"
          >
             <div class="text-center text-neutral-100">
-              <strong class="block font-bold text-xl">
-                {item.data.title}
-              </strong>
+          <strong   class="block font-bold text-xl"  set:html={item.data.title}>
+</strong>
               {item.data.description && (
                 <p class="mt-2 text-sm">{item.data.description}</p>
               )}

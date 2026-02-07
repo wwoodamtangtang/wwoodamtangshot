@@ -10,28 +10,32 @@ import shutil
 
 def sanitize_filename(filename):
     """파일명에서 한글/특수문자 제거, 영문+숫자만 남기기"""
-    # 확장자 분리
     stem = Path(filename).stem
     ext = Path(filename).suffix
     
-    # 영문, 숫자, 하이픈, 언더스코어만 허용
-    clean_stem = re.sub(r'[^a-zA-Z0-9\-_]', '', stem)
+    # 영문, 숫자, 하이픈만 허용 (언더스코어 제거)
+    clean_stem = re.sub(r'[^a-zA-Z0-9\-]', '', stem)
     
-    # 언더스코어로 시작하면 제거
-    clean_stem = clean_stem.lstrip('_')
+    # 언더스코어와 하이픈으로 시작하면 제거
+    clean_stem = clean_stem.lstrip('_-')
+    
+    # 연속된 하이픈 제거 (-- → -)
+    clean_stem = re.sub(r'-+', '-', clean_stem)
+    
+    # 끝에 하이픈 제거
+    clean_stem = clean_stem.rstrip('-')
     
     return f"{clean_stem}{ext}"
 
 def find_best_cover(image_files):
     """가장 적합한 커버 이미지 찾기"""
-    # 1. 한글/특수문자 없는 파일 우선
+    # 한글/특수문자 없는 파일 우선
     simple_files = [f for f in image_files 
-                   if re.match(r'^[a-zA-Z0-9\-_.]+$', f.name)]
+                   if re.match(r'^[a-zA-Z0-9\-]+\.(jpg|jpeg|png)$', f.name, re.IGNORECASE)]
     
     if simple_files:
         return simple_files[0]
     
-    # 2. 없으면 첫 번째 파일
     return image_files[0] if image_files else None
 
 def upload_photos():
@@ -43,10 +47,8 @@ def upload_photos():
         return
     
     folder_name = Path(photo_folder).name
-    slug = folder_name.replace(" ", "-").lower()
-    title = folder_name
     
-    # 날짜 추출
+    # 날짜 추출 (6자리 숫자)
     date_match = re.match(r'(\d{6})', folder_name)
     if date_match:
         date_str = date_match.group(1)
@@ -54,14 +56,24 @@ def upload_photos():
         month = date_str[2:4]
         day = date_str[4:6]
         date = f"{year}-{month}-{day}"
+        
+        # 폴더명은 숫자만 (기존 앨범 패턴 따라가기)
+        slug = date_str  # 예: 260131
     else:
+        # 날짜 형식이 없으면 원본 폴더명 사용
+        slug = folder_name.replace(" ", "-").lower()
         date = datetime.now().strftime("%Y-%m-%d")
     
-    # 1. 사진 복사
+    # title은 원본 폴더명 그대로
+    title = folder_name
+    
+    # 1. 사진 복사 (폴더명은 숫자만!)
     dest = script_dir / "public" / "albums" / slug
     dest.mkdir(parents=True, exist_ok=True)
     
     print(f"📁 폴더 생성: {dest}")
+    print(f"📁 slug: {slug}")
+    print(f"📁 title: {title}")
     
     # 파일 복사하면서 문제 있는 파일명 정리
     copied_files = []
@@ -69,12 +81,16 @@ def upload_photos():
         if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png']:
             # 파일명 정리
             clean_name = sanitize_filename(item.name)
+            
+            if not clean_name or clean_name == item.suffix:
+                print(f"⚠️  건너뛰기: {item.name} (파일명이 비어있음)")
+                continue
+            
             dest_file = dest / clean_name
             
             # 디버깅 출력
             print(f"원본: {item.name}")
             print(f"정리: {clean_name}")
-            print(f"목적지: {dest_file}")
             
             try:
                 # 복사
@@ -90,18 +106,18 @@ def upload_photos():
     
     # 2. 최적의 커버 이미지 선택
     cover_file = find_best_cover(copied_files)
-    cover = f"{slug}/{cover_file.name}"
+    cover = f"{title}/{cover_file.name}"  # title은 원본 (공백 포함)
     
     print(f"🖼️  커버 이미지: {cover}")
     
-    # 3. yml 생성
+    # 3. yml 생성 (기존 패턴 따라가기!)
     yml_content = f'''title: "{title}"
-slug: "{slug}"
+slug: "{title}"
 date: {date}
 cover: {cover}
 '''
     
-    yml_path = script_dir / "src" / "content" / "albums" / f"{slug}.yml"
+    yml_path = script_dir / "src" / "content" / "albums" / f"{title}.yml"
     yml_path.write_text(yml_content)
     
     print(f"📝 yml 생성 완료!")

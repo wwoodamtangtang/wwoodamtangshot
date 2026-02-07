@@ -22,3 +22,7 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+build/
+dist/
+앨범관리자.app
+.eggs/

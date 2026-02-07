@@ -6,6 +6,7 @@ import subprocess
 import re
 from pathlib import Path
 from datetime import datetime
+import shutil
 
 def sanitize_filename(filename):
     """파일명에서 한글/특수문자 제거, 영문+숫자만 남기기"""
@@ -70,11 +71,18 @@ def upload_photos():
             clean_name = sanitize_filename(item.name)
             dest_file = dest / clean_name
             
-            # 복사
-            import shutil
-            shutil.copy2(item, dest_file)
-            copied_files.append(dest_file)
-            print(f"✅ 복사: {item.name} → {clean_name}")
+            # 디버깅 출력
+            print(f"원본: {item.name}")
+            print(f"정리: {clean_name}")
+            print(f"목적지: {dest_file}")
+            
+            try:
+                # 복사
+                shutil.copy2(item, dest_file)
+                copied_files.append(dest_file)
+                print(f"✅ 복사 성공!\n")
+            except Exception as e:
+                print(f"❌ 복사 실패: {e}\n")
     
     if not copied_files:
         messagebox.showerror("오류", "이미지 파일이 없습니다!")

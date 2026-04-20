@@ -1,5 +1,4 @@
 ---
-import { Image } from "astro:assets";
 import { getCollection } from "astro:content";
 import Layout from "../../layouts/Layout.astro";
 import { getAlbumImages } from "../../utils/albums";
@@ -21,17 +20,16 @@ const images = await getAlbumImages(album.id);
     <h1 class="text-5xl font-bold my-6" set:html={album.data.title}></h1>
     <p class="text-xl my-4">{album.data.description}</p>
     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 gap-0.5">
-      {images.map((src, i) => (
+      {images.map((image, i) => (
         <div
           class="relative w-full pb-[100%] cursor-pointer image-thumb"
           data-index={i}
         >
-          <Image
-            src={src}
+          <img
+            src={image.src}
             alt={`Photo ${i + 1}`}
-            widths={[240, 540, 720]}
-            format="webp"
-            quality={20}
+            loading="lazy"
+            decoding="async"
             class="absolute inset-0 w-full h-full object-cover rounded-sm"
           />
         </div>
@@ -55,7 +53,7 @@ const images = await getAlbumImages(album.id);
     <div id="track-wrapper">
       <div id="track-inner">
         {images.map((image, i) => {
-          const { src, exif } = image;
+          const { exif } = image;
           const exptime = exif.ExposureTime;
           const shutterStr = typeof exptime === 'number'
             ? (exptime < 1 ? `1/${Math.round(1 / exptime)}` : `${exptime}`)
@@ -66,12 +64,9 @@ const images = await getAlbumImages(album.id);
             : '';
           return (
             <div class="slide">
-              <Image
-                src={image}
+              <img
+                src={image.src}
                 alt={`Photo ${i + 1}`}
-                widths={[240, 540, 720, 1920]}
-                format="webp"
-                quality={85}
                 class="max-w-full max-h-full object-contain"
               />
               <figcaption class="caption text-center">
@@ -86,7 +81,7 @@ const images = await getAlbumImages(album.id);
     <!-- Mobile Feed -->
     <div id="mobile-feed">
       {images.map((image, i) => {
-        const { src, exif } = image;
+        const { exif } = image;
         const exptime = exif.ExposureTime;
         const shutterStr = typeof exptime === 'number'
           ? (exptime < 1 ? `1/${Math.round(1 / exptime)}` : `${exptime}`)
@@ -97,12 +92,11 @@ const images = await getAlbumImages(album.id);
           : '';
         return (
           <div class="feed-item" data-index={i}>
-            <Image
-              src={image}
+            <img
+              src={image.src}
               alt={`Photo ${i + 1}`}
-              widths={[240, 540, 720, 1080]}
-              format="webp"
-              quality={85}
+              loading="lazy"
+              decoding="async"
               class="w-full object-contain rounded-sm"
             />
             <figcaption class="caption">

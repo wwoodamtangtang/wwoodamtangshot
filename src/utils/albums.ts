@@ -1,45 +1,44 @@
 // src/utils/albums.ts
 import exifr from "exifr";
 import path from "path";
-import type { ImageMetadata } from "astro:assets";
+import fs from "fs";
 
 export async function getAlbumImages(albumId: string) {
-  // 1) 이 파일(src/utils) 기준으로 한 칸 위 폴더(src) 내 content/albums 을 glob
-  const images = import.meta.glob<{ default: ImageMetadata }>(
-    "../content/albums/**/*.{jpeg,jpg}"
-  );
+  // 빌드 타임에 Node.js fs로 파일 목록 직접 읽기 (import.meta.glob 미사용)
+  // → Vite가 이미지 파일을 자산으로 분석하지 않아 빌드 속도 대폭 개선
+  const albumDir = path.join(process.cwd(), "src", "content", "albums", albumId);
 
-  // 2) albumId 포함된 파일만 필터
-  const entries = Object.entries(images).filter(([filepath]) =>
-    filepath.includes(`/content/albums/${albumId}/`)
-  );
+  if (!fs.existsSync(albumDir)) return [];
 
-  // 3) 각 이미지마다 EXIF 파싱 & meta 합치기
+  const files = fs
+    .readdirSync(albumDir)
+    .filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f))
+    .sort();
+
   const resolved = await Promise.all(
-    entries.map(async ([filepath, importer]) => {
-      // Astro가 제공하는 이미지 메타
-      const { default: meta } = await importer();
+    files.map(async (filename) => {
+      const realPath = path.join(albumDir, filename);
 
-      // filepath 예: "../content/albums/2025-03-17/DSF7676.jpeg"
-      // 앞의 "../" 제거 → "content/albums/2025-03-17/DSF7676.jpeg"
-      let relPath = filepath.replace(/^\.\.\//, "");
-      // 실제 파일 시스템 경로: 프로젝트 루트/src/content/...
-      const realPath = path.join(process.cwd(), "src", relPath);
+      // EXIF 파싱 (실패 시 빈 객체 반환)
+      const exif = await exifr
+        .parse(realPath, [
+          "Make",
+          "Model",
+          "FNumber",
+          "ExposureTime",
+          "ISO",
+          "DateTimeOriginal",
+        ])
+        .catch(() => ({}));
 
-      // EXIF 파싱
-      const exif = await exifr.parse(realPath, [
-        "Make",
-        "Model",
-        "FNumber",
-        "ExposureTime",
-        "ISO",
-        "DateTimeOriginal",
-      ]);
+      // 공개 URL 생성: publicDir="src/content" → /albums/albumId/filename
+      const urlPath =
+        "/albums/" +
+        encodeURIComponent(albumId) +
+        "/" +
+        encodeURIComponent(filename);
 
-      return {
-        ...meta,
-        exif,
-      };
+      return { src: urlPath, exif: exif || {} };
     })
   );
 

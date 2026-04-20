@@ -249,32 +249,37 @@ class AlbumManager:
                 
                 self.log(f"✅ 폴더 생성: {dest}")
                 
-                # 파일 복사
+                # 파일 복사 (WebP 변환)
                 copied_files = []
-                for item in Path(photo_folder).iterdir():
-                    if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-                        clean_name = self.sanitize_filename(item.name)
-                        
-                        if not clean_name or clean_name == item.suffix:
+                for item in sorted(Path(photo_folder).iterdir()):
+                    if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
+                        clean_stem = self.sanitize_filename(item.name)
+                        clean_stem = Path(clean_stem).stem  # 확장자 제거
+
+                        if not clean_stem:
                             self.log(f"⚠️  건너뛰기: {item.name}")
                             continue
-                        
-                        dest_file = dest / clean_name
-                        
-                        self.log(f"📋 {item.name} → {clean_name}")
-                        
+
+                        webp_name = clean_stem + '.webp'
+                        dest_file = dest / webp_name
+
+                        self.log(f"🔄 {item.name} → {webp_name} (WebP 변환 중...)")
+
                         try:
-                            shutil.copy2(item, dest_file)
+                            with Image.open(item) as img:
+                                if img.mode in ('RGBA', 'LA', 'P'):
+                                    img = img.convert('RGB')
+                                img.save(dest_file, 'WEBP', quality=85)
                             copied_files.append(dest_file)
                         except Exception as e:
-                            self.log(f"❌ 복사 실패: {e}", "stderr")
+                            self.log(f"❌ 변환 실패: {e}", "stderr")
                 
                 if not copied_files:
                     self.log("❌ 이미지 파일이 없습니다!", "stderr")
                     messagebox.showerror("오류", "이미지 파일이 없습니다!")
                     return
                 
-                self.log(f"✅ 총 {len(copied_files)}개 파일 복사 완료")
+                self.log(f"✅ 총 {len(copied_files)}개 파일 WebP 변환 완료")
                 
                 # 커버 이미지
                 cover_file = self.find_best_cover(copied_files)
@@ -370,8 +375,11 @@ cover: {cover}
             ttk.Label(self.photos_scrollable_frame, text="앨범 폴더가 없습니다!").pack()
             return
         
-        images = list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) + list(album_dir.glob("*.png"))
-        
+        images = sorted(
+            list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) +
+            list(album_dir.glob("*.png")) + list(album_dir.glob("*.webp"))
+        )
+
         if not images:
             ttk.Label(self.photos_scrollable_frame, text="이미지 파일이 없습니다!").pack()
             return
@@ -421,7 +429,10 @@ cover: {cover}
                 yml_content = yml_path.read_text()
                 if photo_path.name in yml_content:
                     album_dir = self.script_dir / "src" / "content" / "albums" / album_name
-                    remaining_images = list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg"))
+                    remaining_images = sorted(
+                        list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) +
+                        list(album_dir.glob("*.png")) + list(album_dir.glob("*.webp"))
+                    )
                     
                     if remaining_images:
                         new_cover = f"{album_name}/{remaining_images[0].name}"
@@ -451,8 +462,11 @@ cover: {cover}
             messagebox.showerror("오류", "앨범 폴더가 없습니다!")
             return
         
-        images = list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) + list(album_dir.glob("*.png"))
-        
+        images = sorted(
+            list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) +
+            list(album_dir.glob("*.png")) + list(album_dir.glob("*.webp"))
+        )
+
         if not images:
             messagebox.showerror("오류", "이미지 파일이 없습니다!")
             return

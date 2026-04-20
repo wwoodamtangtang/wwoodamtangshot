@@ -24,5 +24,4 @@ pnpm-debug.log*
 .idea/
 build/
 dist/
-앨범관리자.app
 .eggs/

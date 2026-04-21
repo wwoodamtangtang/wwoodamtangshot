@@ -249,8 +249,9 @@ class AlbumManager:
                 
                 self.log(f"✅ 폴더 생성: {dest}")
                 
-                # 파일 복사 (WebP 변환)
+                # 파일 복사 (WebP 변환, 이미 존재하는 파일은 건너뜀)
                 copied_files = []
+                skipped_files = []
                 for item in sorted(Path(photo_folder).iterdir()):
                     if item.is_file() and item.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
                         clean_stem = self.sanitize_filename(item.name)
@@ -263,6 +264,13 @@ class AlbumManager:
                         webp_name = clean_stem + '.webp'
                         dest_file = dest / webp_name
 
+                        # 이미 변환된 파일은 건너뜀
+                        if dest_file.exists():
+                            self.log(f"⏭️  건너뜀 (이미 존재): {webp_name}")
+                            skipped_files.append(dest_file)
+                            copied_files.append(dest_file)
+                            continue
+
                         self.log(f"🔄 {item.name} → {webp_name} (WebP 변환 중...)")
 
                         try:
@@ -273,13 +281,14 @@ class AlbumManager:
                             copied_files.append(dest_file)
                         except Exception as e:
                             self.log(f"❌ 변환 실패: {e}", "stderr")
-                
+
                 if not copied_files:
                     self.log("❌ 이미지 파일이 없습니다!", "stderr")
                     messagebox.showerror("오류", "이미지 파일이 없습니다!")
                     return
-                
-                self.log(f"✅ 총 {len(copied_files)}개 파일 WebP 변환 완료")
+
+                new_count = len(copied_files) - len(skipped_files)
+                self.log(f"✅ 총 {len(copied_files)}개 처리 완료 (신규: {new_count}개, 건너뜀: {len(skipped_files)}개)")
                 
                 # 커버 이미지
                 cover_file = self.find_best_cover(copied_files)

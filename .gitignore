@@ -23,6 +23,9 @@ pnpm-debug.log*
 # Claude Code worktrees
 .claude/worktrees/
 
+# Thumbnail cache
+.thumbs/
+
 # jetbrains setting folder
 .idea/
 build/

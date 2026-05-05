@@ -20,6 +20,9 @@ pnpm-debug.log*
 # macOS-specific files
 .DS_Store
 
+# Claude Code worktrees
+.claude/worktrees/
+
 # jetbrains setting folder
 .idea/
 build/

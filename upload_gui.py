@@ -377,13 +377,15 @@ cover: {cover}
         """사진 그리드 표시"""
         for widget in self.photos_scrollable_frame.winfo_children():
             widget.destroy()
-        
+
+        self.check_vars = {}  # img_path -> BooleanVar
+
         album_dir = self.script_dir / "src" / "content" / "albums" / album_name
-        
+
         if not album_dir.exists():
             ttk.Label(self.photos_scrollable_frame, text="앨범 폴더가 없습니다!").pack()
             return
-        
+
         images = sorted(
             list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) +
             list(album_dir.glob("*.png")) + list(album_dir.glob("*.webp"))
@@ -392,36 +394,114 @@ cover: {cover}
         if not images:
             ttk.Label(self.photos_scrollable_frame, text="이미지 파일이 없습니다!").pack()
             return
-        
-        ttk.Label(self.photos_scrollable_frame, 
-                 text=f"총 {len(images)}장", 
-                 font=("Arial", 12, "bold")).pack(pady=10)
-        
+
+        # 상단 컨트롤 바
+        ctrl_frame = ttk.Frame(self.photos_scrollable_frame)
+        ctrl_frame.pack(fill='x', padx=5, pady=(8, 4))
+
+        ttk.Label(ctrl_frame, text=f"총 {len(images)}장",
+                  font=("Arial", 12, "bold")).pack(side='left')
+
+        self.select_all_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(ctrl_frame, text="전체 선택",
+                        variable=self.select_all_var,
+                        command=lambda: self.toggle_select_all()).pack(side='left', padx=15)
+
+        self.delete_selected_btn = ttk.Button(
+            ctrl_frame, text="🗑️ 선택 삭제",
+            command=lambda: self.delete_selected_photos(album_name)
+        )
+        self.delete_selected_btn.pack(side='right')
+
+        ttk.Separator(self.photos_scrollable_frame, orient='horizontal').pack(fill='x', padx=5, pady=4)
+
+        # 사진 그리드
         row_frame = None
         for i, img_path in enumerate(images):
             if i % 3 == 0:
                 row_frame = ttk.Frame(self.photos_scrollable_frame)
                 row_frame.pack(pady=5, fill='x')
-            
+
             photo_frame = ttk.Frame(row_frame, relief='solid', borderwidth=1)
             photo_frame.pack(side='left', padx=5, pady=5)
-            
+
+            # 체크박스
+            var = tk.BooleanVar(value=False)
+            self.check_vars[img_path] = var
+            cb = ttk.Checkbutton(photo_frame, variable=var,
+                                  command=self._on_check_change)
+            cb.pack(anchor='w', padx=4)
+
             try:
                 img = Image.open(img_path)
                 img.thumbnail((200, 200))
                 photo = ImageTk.PhotoImage(img)
-                
-                label = tk.Label(photo_frame, image=photo)
+
+                # 이미지 클릭 시 체크박스 토글
+                label = tk.Label(photo_frame, image=photo, cursor="hand2")
                 label.image = photo
                 label.pack()
-                
+                label.bind("<Button-1>", lambda e, v=var: v.set(not v.get()) or self._on_check_change())
+
                 ttk.Label(photo_frame, text=img_path.name, font=("Arial", 9)).pack()
-                
+
                 ttk.Button(photo_frame, text="🗑️ 삭제",
-                          command=lambda p=img_path, a=album_name: self.delete_photo(p, a)).pack(pady=5)
-                
+                           command=lambda p=img_path, a=album_name: self.delete_photo(p, a)).pack(pady=5)
+
             except Exception as e:
                 ttk.Label(photo_frame, text=f"{img_path.name}\n로드 실패").pack()
+
+    def toggle_select_all(self):
+        """전체 선택 / 전체 해제"""
+        state = self.select_all_var.get()
+        for var in self.check_vars.values():
+            var.set(state)
+
+    def _on_check_change(self):
+        """개별 체크 변경 시 전체선택 체크박스 상태 동기화"""
+        all_checked = all(v.get() for v in self.check_vars.values())
+        self.select_all_var.set(all_checked)
+
+    def delete_selected_photos(self, album_name):
+        """선택된 사진 일괄 삭제"""
+        selected = [p for p, v in self.check_vars.items() if v.get()]
+
+        if not selected:
+            messagebox.showwarning("경고", "삭제할 사진을 선택하세요!")
+            return
+
+        if not messagebox.askyesno("확인", f"선택한 {len(selected)}장을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다!"):
+            return
+
+        deleted_names = set()
+        for photo_path in selected:
+            try:
+                self.log(f"🗑️ 삭제: {photo_path.name}")
+                photo_path.unlink()
+                deleted_names.add(photo_path.name)
+            except Exception as e:
+                self.log(f"❌ 삭제 실패 ({photo_path.name}): {e}", "stderr")
+
+        # 삭제된 사진이 커버였다면 yml 업데이트
+        yml_path = self.script_dir / "src" / "content" / "albums" / f"{album_name}.yml"
+        if yml_path.exists():
+            yml_content = yml_path.read_text()
+            cover_match = re.search(r'cover: .+?/(.+)', yml_content)
+            if cover_match and cover_match.group(1) in deleted_names:
+                album_dir = self.script_dir / "src" / "content" / "albums" / album_name
+                remaining = sorted(
+                    list(album_dir.glob("*.jpg")) + list(album_dir.glob("*.jpeg")) +
+                    list(album_dir.glob("*.png")) + list(album_dir.glob("*.webp"))
+                )
+                if remaining:
+                    new_cover = f"{album_name}/{remaining[0].name}"
+                    yml_content = re.sub(r'cover: .*', f'cover: {new_cover}', yml_content)
+                    yml_path.write_text(yml_content)
+                    self.log(f"🖼️ 커버 이미지 자동 변경: {remaining[0].name}")
+
+        self.log(f"✅ {len(deleted_names)}장 삭제 완료")
+        messagebox.showinfo("완료", f"{len(deleted_names)}장이 삭제되었습니다!")
+        self.show_photos_grid(album_name)
     
     def delete_photo(self, photo_path, album_name):
         """사진 삭제"""
@@ -569,25 +649,29 @@ cover: {cover}
         self.album_info.delete('1.0', 'end')
     
     def deploy_changes(self):
-        """Git 배포"""
-        self.log("\n🚀 Git 배포 시작...")
-        
-        try:
-            if not self.run_command(["git", "add", "."]):
-                raise Exception("git add 실패")
-            
-            if not self.run_command(["git", "commit", "-m", "update: 앨범 변경"]):
-                self.log("⚠️ 커밋할 변경사항이 없음")
-            
-            if not self.run_command(["git", "push"]):
-                raise Exception("git push 실패")
-            
-            self.log("✅ 배포 완료!\n", "info")
-            messagebox.showinfo("완료", "🚀 배포 완료!")
-            
-        except Exception as e:
-            self.log(f"❌ 배포 실패: {e}\n", "stderr")
-            messagebox.showerror("오류", f"Git 오류:\n{e}")
+        """Git 배포 (백그라운드 스레드에서 실행)"""
+        def deploy_thread():
+            self.log("\n🚀 Git 배포 시작...")
+            try:
+                if not self.run_command(["git", "add", "."]):
+                    raise Exception("git add 실패")
+
+                commit_ok = self.run_command(["git", "commit", "-m", "update: 앨범 변경"])
+                if not commit_ok:
+                    self.log("⚠️ 커밋할 변경사항이 없음")
+
+                if not self.run_command(["git", "push"]):
+                    raise Exception("git push 실패")
+
+                self.log("✅ 배포 완료!\n", "info")
+                self.root.after(0, lambda: messagebox.showinfo("완료", "🚀 배포 완료!"))
+
+            except Exception as e:
+                self.log(f"❌ 배포 실패: {e}\n", "stderr")
+                self.root.after(0, lambda e=e: messagebox.showerror("오류", f"Git 오류:\n{e}"))
+
+        thread = threading.Thread(target=deploy_thread, daemon=True)
+        thread.start()
 
 if __name__ == "__main__":
     root = tk.Tk()
